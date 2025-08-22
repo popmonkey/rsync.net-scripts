@@ -15,7 +15,7 @@ else
 fi
 
 LOCK_FILE="/tmp/system-backup.pid"
-HELPER_SCRIPT="${SCRIPT_DIR}/rsync-with-ignore-moved.sh"
+HELPER_SCRIPT="${SCRIPT_DIR}/rsync-run.sh"
 
 # --- Lock Handling ---
 cleanup() {
