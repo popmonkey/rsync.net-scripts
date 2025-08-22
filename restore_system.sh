@@ -14,9 +14,6 @@ else
     exit 1
 fi
 
-# Path to the exclusion file, located in the same directory as the script
-EXCLUDE_FILE="${SCRIPT_DIR}/restore-exclude.list"
-
 # --- Graceful Exit on CTRL-C ---
 trap 'echo -e "\n\nCTRL-C detected. Aborting restore."; exit 130;' SIGINT
 
@@ -62,8 +59,8 @@ if ! mountpoint -q "${RESTORE_TARGET}"; then
 fi
 
 # 4. Check for the exclusion file
-if [ ! -f "${EXCLUDE_FILE}" ]; then
-    echo "ERROR: The exclusion file is missing at '${EXCLUDE_FILE}'."
+if [ ! -f "${RESTORE_EXCLUDE_FILE_PATH}" ]; then
+    echo "ERROR: The restore exclusion file is missing at '${RESTORE_EXCLUDE_FILE_PATH}'."
     exit 1
 fi
 
@@ -94,7 +91,7 @@ RSYNC_BASE_COMMAND="rsync \
     --verbose \
     --partial \
     --append-verify \
-    --exclude-from='${EXCLUDE_FILE}' \
+    --exclude-from='${RESTORE_EXCLUDE_FILE_PATH}' \
     --rsync-path=\"rsync --fake-super\""
 
 if [ "$USE_RETRY_LOOP" = true ]; then

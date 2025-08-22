@@ -15,6 +15,13 @@ BACKUP_SSH_KEY="/path/to/id_rsync.net"
 # Path to the rsync.net SSH key in the LIVE RESTORE ENVIRONMENT
 RESTORE_SSH_KEY="/path/to/id_rsyncnet"
 
+# --- File Paths ---
+# The ABSOLUTE path to the exclude file for the system backup.
+BACKUP_EXCLUDE_FILE_PATH="/path/to/your/exclude.list"
+
+# The ABSOLUTE path to the exclude file for the system restore.
+RESTORE_EXCLUDE_FILE_PATH="/path/to/your/restore-exclude.list"
+
 # --- Restore Target Configuration ---
 # The mount point for the new system's ROOT partition during restore
 RESTORE_TARGET="/mnt"

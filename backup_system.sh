@@ -16,7 +16,6 @@ fi
 
 LOCK_FILE="/tmp/system-backup.pid"
 HELPER_SCRIPT="${SCRIPT_DIR}/rsync-with-ignore-moved.sh"
-EXCLUDE_FILE="${SCRIPT_DIR}/exclude.list"
 
 # --- Lock Handling ---
 cleanup() {
@@ -48,6 +47,13 @@ if [[ -n "$(git -C "${SCRIPT_DIR}" status --porcelain)" ]]; then
     echo "#####################################################################" >&2
 fi
 
+# --- Pre-run check for exclude file ---
+if [ ! -f "${BACKUP_EXCLUDE_FILE_PATH}" ]; then
+    echo "ERROR: Backup exclude file not found at '${BACKUP_EXCLUDE_FILE_PATH}'" >&2
+    exit 1
+fi
+
+
 # --- Start Backup ---
 echo "Starting backup at $(date)"
 
@@ -67,7 +73,7 @@ echo "Starting backup at $(date)"
     --delete-excluded \
     -e "ssh -i ${BACKUP_SSH_KEY}" \
     --rsync-path="rsync --fake-super" \
-    --exclude-from="${EXCLUDE_FILE}" \
+    --exclude-from="${BACKUP_EXCLUDE_FILE_PATH}" \
     / \
     "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_BASE_PATH}/"
 
