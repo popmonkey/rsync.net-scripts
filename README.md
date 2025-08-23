@@ -71,12 +71,47 @@ sudo ./backup_system.sh
 It is highly recommended to set this up as a cron job to run automatically. For example, to run it every night at 3:00 AM, edit the root crontab (`sudo crontab -e`) and add:
 
 ```crontab
-0 3 * * * sudo /path/to/your/scripts/backup_system.sh
+0 3 * * * /path/to/your/scripts/backup_system.sh
 ```
 
 ---
 
-## 3. Full System Restore
+## 3. Setting Up Passwordless Cron Jobs (Optional)
+
+If you want to run the backup script from a non-root user's crontab, you need to grant that user passwordless `sudo` access **specifically for that script**. This is much safer than giving the user full passwordless sudo.
+
+### Step 1: Edit the Sudoers File
+
+The safest way to edit the sudoers configuration is with the `visudo` command, which validates the syntax before saving. Run this command as root:
+
+```bash
+sudo visudo
+```
+
+### Step 2: Add the Rule
+
+Scroll to the bottom of the file and add the following line. Replace `your_username` with the user who will be running the cron job, and make sure the path to `backup_system.sh` is correct.
+
+```
+# Allow your_username to run the backup script without a password
+your_username ALL=(ALL) NOPASSWD: /path/to/your/scripts/backup_system.sh
+```
+
+Save and exit the editor.
+
+### Step 3: Update the Crontab
+
+Now, you can edit the crontab for that specific user (`crontab -e` while logged in as them) and add the command using `sudo`:
+
+```crontab
+0 3 * * * sudo /path/to/your/scripts/backup_system.sh
+```
+
+This setup ensures the cron job can run with the necessary root privileges without requiring a password, while limiting the scope of those privileges to only the backup script.
+
+---
+
+## 4. Full System Restore
 
 Restoring a full system is a multi-step process performed from a live Linux environment (like a Debian installer USB).
 
@@ -131,7 +166,7 @@ Your system should now boot from the restored disk.
 
 ---
 
-## 4. Restoring a Single LXC Container
+## 5. Restoring a Single LXC Container
 
 After you have a running host system (either the original or a newly restored one), you can restore individual LXC containers.
 
