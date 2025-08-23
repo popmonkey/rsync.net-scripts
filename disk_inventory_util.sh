@@ -108,16 +108,18 @@ function run_inventory() {
     echo -e "${GREEN}--- Directories with > $FILE_COUNT_THRESHOLD files (direct children only) ---${NC}"
 
     # This 'find' command's stderr is also piped to the error_handler.
+    # The pipeline is ordered to sort numerically BEFORE adding color codes.
     { find "$START_DIR" -type f -printf '%h\n' 2> >(error_handler); } | \
         sort | \
         uniq -c | \
-        awk -v threshold="$FILE_COUNT_THRESHOLD" -v white="$WHITE" -v nc="$NC" '
-        $1 >= threshold {
+        awk -v threshold="$FILE_COUNT_THRESHOLD" '$1 >= threshold' | \
+        sort -nr | \
+        awk -v white="$WHITE" -v nc="$NC" '{
+            count = $1;
             path_start_index = index($0, $2);
             path = substr($0, path_start_index);
-            printf "%s%s files\t- %s%s\n", white, $1, path, nc;
-        }' | \
-        sort -nr
+            printf "%s%s files\t- %s%s\n", white, count, path, nc;
+        }'
     echo ""
 
 
