@@ -8,6 +8,7 @@ CONFIG_FILE="${SCRIPT_DIR}/config.sh"
 
 # Load the configuration file
 if [ -f "$CONFIG_FILE" ]; then
+    # shellcheck source=config.sh
     source "$CONFIG_FILE"
 else
     echo "ERROR: Configuration file not found at ${CONFIG_FILE}"
@@ -15,7 +16,6 @@ else
 fi
 
 LOCK_FILE="/tmp/system-backup.pid"
-HELPER_SCRIPT="${SCRIPT_DIR}/rsync-run.sh"
 
 # --- Lock Handling ---
 cleanup() {
@@ -53,30 +53,79 @@ if [ ! -f "${BACKUP_EXCLUDE_FILE_PATH}" ]; then
     exit 1
 fi
 
+# --- rsync Command Configuration ---
+# All rsync arguments are defined in this array for readability.
+# They will be combined into a single command for execution.
+rsync_args=(
+    --archive
+    --acls
+    --xattrs
+    --hard-links
+    --sparse
+    --human-readable
+    --verbose
+    --stats
+    --numeric-ids
+    --bwlimit=31250
+    --delete-after
+    --delete-excluded
+    -e "ssh -i ${BACKUP_SSH_KEY}"
+    --rsync-path="rsync --fake-super"
+    --exclude-from="${BACKUP_EXCLUDE_FILE_PATH}"
+)
+
+# Add dry-run flag if there are uncommitted changes
+if [[ -n "${DRY_RUN_FLAG}" ]]; then
+    rsync_args+=("--dry-run")
+fi
+
+# Source and Destination paths
+SOURCE_PATH="/"
+DEST_PATH="${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_BASE_PATH}/"
+
+# --- Argument Handling ---
+# If the first argument is "ssh_command", print the command and exit.
+# This is useful for setting up restricted SSH keys.
+if [[ "$1" == "ssh_command" ]]; then
+    # Build the command string with single spaces between arguments.
+    COMMAND_STRING="/usr/bin/rsync"
+    for arg in "${rsync_args[@]}"; do
+        COMMAND_STRING+=" ${arg}"
+    done
+    COMMAND_STRING+=" ${SOURCE_PATH}"
+    COMMAND_STRING+=" ${DEST_PATH}"
+
+    echo "${COMMAND_STRING}"
+    exit 0
+fi
+
+# --- rsync Execution Function ---
+# This function wraps the rsync call to filter out "file vanished" errors,
+# which can occur during backups of a live system. This logic was previously
+# in the rsync-run.sh helper script.
+run_rsync_with_filter() {
+    local status
+    local IGNOREEXIT=24
+    local IGNOREOUT='^(file has vanished: |rsync warning: some files vanished before they could be transferred)'
+
+    # The magic redirection below filters stderr from rsync without touching stdout.
+    set -o pipefail
+    { /usr/bin/rsync "$@" 2>&1 1>&3 3>&- | grep -E -v "$IGNOREOUT"; status=${PIPESTATUS[0]}; } 3>&1 1>&2
+    set +o pipefail
+
+    if [[ $status == $IGNOREEXIT ]]; then
+        echo "INFO: rsync exited with status ${IGNOREEXIT} (files vanished), treating as success."
+        return 0
+    fi
+
+    return $status
+}
 
 # --- Start Backup ---
 echo "Starting backup at $(date)"
 
-/usr/bin/time -v "${HELPER_SCRIPT}" \
-    ${DRY_RUN_FLAG} \
-    --archive \
-    --acls \
-    --xattrs \
-    --hard-links \
-    --sparse \
-    --human-readable \
-    --verbose \
-    --stats \
-    --numeric-ids \
-    --bwlimit=31250 \
-    --delete-after \
-    --delete-excluded \
-    -e "ssh -i ${BACKUP_SSH_KEY}" \
-    --rsync-path="rsync --fake-super" \
-    --exclude-from="${BACKUP_EXCLUDE_FILE_PATH}" \
-    / \
-    "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_BASE_PATH}/"
-
+# We wrap the call to our function with /usr/bin/time to get performance stats.
+/usr/bin/time -v run_rsync_with_filter "${rsync_args[@]}" "${SOURCE_PATH}" "${DEST_PATH}"
 status=${?}
 
 # --- Finish Backup ---

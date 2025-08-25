@@ -1,6 +1,6 @@
 # Bare Metal & VM rsync.net Backup/Restore System
 
-This suite of scripts provides a robust, configurable system for performing full `rsync` backups of a Debian server and restoring it to either bare metal or a virtual machine.  It is designed to be used with rsync.net.
+This suite of scripts provides a robust, configurable system for performing full `rsync` backups of a Debian server and restoring it to either bare metal or a virtual machine. It is designed to be used with rsync.net.
 
 ## File Structure
 
@@ -12,7 +12,6 @@ The system is composed of the following files:
 -   `restore_system_bm.sh`: The second stage for restoring to **bare metal**. Makes the system bootable.
 -   `restore_system_vm.sh`: The second stage for restoring to a **virtual machine**.
 -   `restore_lxc.sh`: A standalone script to restore an individual LXC container to a running host.
--   `rsync-run.sh`: A helper script that prevents errors if files are moved/deleted during a long backup.
 -   `backup-exclude.list`: A file containing a list of paths to **exclude from backups**.
 -   `restore-exclude.list`: A file containing a list of paths to **exclude from restores**.
 
@@ -80,7 +79,24 @@ It is highly recommended to set this up as a cron job to run automatically. For 
 
 If you want to run the backup script from a non-root user's crontab, you need to grant that user passwordless `sudo` access **specifically for that script**. This is much safer than giving the user full passwordless sudo.
 
-### Step 1: Edit the Sudoers File
+### Step 1: Secure the Script Files (CRITICAL)
+
+Before editing the `sudoers` file, you **must** ensure that the user running the cron job cannot modify the backup script or its configuration. Otherwise, they could edit the script to run any command as root.
+
+Set the ownership of the scripts to `root` and remove write permissions for anyone else.
+
+```bash
+# Set ownership to root user and group
+sudo chown root:root /path/to/your/scripts/backup_system.sh
+sudo chown root:root /path/to/your/scripts/config.sh
+
+# Set permissions: owner (root) can read/write/execute, others can only read/execute
+sudo chmod 755 /path/to/your/scripts/backup_system.sh
+# Set permissions: owner (root) can read/write, others can only read
+sudo chmod 644 /path/to/your/scripts/config.sh
+```
+
+### Step 2: Edit the Sudoers File
 
 The safest way to edit the sudoers configuration is with the `visudo` command, which validates the syntax before saving. Run this command as root:
 
@@ -88,7 +104,7 @@ The safest way to edit the sudoers configuration is with the `visudo` command, w
 sudo visudo
 ```
 
-### Step 2: Add the Rule
+### Step 3: Add the Sudoers Rule
 
 Scroll to the bottom of the file and add the following line. Replace `your_username` with the user who will be running the cron job, and make sure the path to `backup_system.sh` is correct.
 
@@ -99,7 +115,7 @@ your_username ALL=(ALL) NOPASSWD: /path/to/your/scripts/backup_system.sh
 
 Save and exit the editor.
 
-### Step 3: Update the Crontab
+### Step 4: Update the User's Crontab
 
 Now, you can edit the crontab for that specific user (`crontab -e` while logged in as them) and add the command using `sudo`:
 
@@ -111,7 +127,31 @@ This setup ensures the cron job can run with the necessary root privileges witho
 
 ---
 
-## 4. Full System Restore
+## 4. Restricting SSH Access with `authorized_keys` (Advanced)
+
+For enhanced security, you can configure your remote backup server (e.g., rsync.net) to only allow your SSH key to execute the specific `rsync` command needed for the backup, and nothing else.
+
+The `backup_system.sh` script includes a helper option to facilitate this. To see the exact command the script will execute, run it with the `ssh_command` argument:
+
+```bash
+sudo ./backup_system.sh ssh_command
+```
+
+This will print a single line, which is the full `rsync` command that this script runs on your server to initiate the backup.
+
+**Important:** The output of `ssh_command` is the **client-side** command. The command you need for the `authorized_keys` file on the **remote server** is different. You can use this output as a reference, but the remote command must typically start with `rsync --server`.
+
+You should consult your remote provider's documentation for the exact syntax. For many providers, the entry in your remote `~/.ssh/authorized_keys` file will look something like this:
+
+```
+command="rsync --server --sender --fake-super -vlogDtprxS . \"/path/on/remote/server/\"",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-rsa AAAA... your-key-comment
+```
+
+This ensures that even if the SSH key were compromised, the attacker could only use it to run the intended backup command.
+
+---
+
+## 5. Full System Restore
 
 Restoring a full system is a multi-step process performed from a live Linux environment (like a Debian installer USB).
 
@@ -166,7 +206,7 @@ Your system should now boot from the restored disk.
 
 ---
 
-## 5. Restoring a Single LXC Container
+## 6. Restoring a Single LXC Container
 
 After you have a running host system (either the original or a newly restored one), you can restore individual LXC containers.
 
