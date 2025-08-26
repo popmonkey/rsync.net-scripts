@@ -124,8 +124,10 @@ run_rsync_with_filter() {
 # --- Start Backup ---
 echo "Starting backup at $(date)"
 
+export -f run_rsync_with_filter
+
 # We wrap the call to our function with /usr/bin/time to get performance stats.
-/usr/bin/time -v run_rsync_with_filter "${rsync_args[@]}" "${SOURCE_PATH}" "${DEST_PATH}"
+/usr/bin/time -v bash -c 'run_rsync_with_filter "$@"' _ "${rsync_args[@]}" "${SOURCE_PATH}" "${DEST_PATH}"
 status=${?}
 
 # --- Finish Backup ---
